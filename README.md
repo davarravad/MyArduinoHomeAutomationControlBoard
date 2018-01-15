@@ -1,4 +1,4 @@
-# MyArduinoHomeAutomationControlBoard
+# My Arduino Home Automation
 
 My Arduino Home Automation Control Board Code
 
