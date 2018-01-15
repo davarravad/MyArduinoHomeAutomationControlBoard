@@ -1,8 +1,8 @@
 // **********************************************************************
 // **********************************************************************
-// **  Name    : Arduino Home Automation
+// **  Name    : My Arduino Home Automation
 // **  Author  : David "DaVaR" Sargent
-// **  Date    : 14 Jan, 2018
+// **  Date    : 15 Jan, 2018
 // **  Version : 2.1
 // **  Hardware: AHACB v2.2
 // **          : CD4021B Shift Register(s)
@@ -14,6 +14,7 @@
 // **          : DS18B20 Digital temperature sensors
 // **  Notes   : Use AHACB v2.2 to control lights via light switch
 // **          : buttons, website, or Alexa
+// ** Website  : https://www.MyArduinoHome.com
 // **********************************************************************
 // **********************************************************************
 // ** Include libraries
@@ -62,26 +63,26 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x25 };
 EthernetClient client;
 
 // IP Address or Domain Name to web server
-char server[] = "192.168.1.31";
+char server[] = "***********";  // Web Server Address
+
+// House ID - Needed to connect to web server
+String house_id = "***********";  // House ID from web site
+
+// Token For Website - Needed to connect to web server
+String website_token = "***********"; // Token from web site
+
+// Garage Door strings
+boolean garage_1_enable = true;  // Enable Garage 1 true/false
+boolean garage_2_enable = true;  // Enable Garage 2 true/false
 
 // Let system know if internet is working or not
 boolean internetEnabled = true;
-
-// House ID - Needed to connect to web server
-String house_id = "275";
-
-// Token For Website - Needed to connect to web server
-String website_token = "54a6sd54fa32s1ag6f5h46d35f4hsd8gj4546f4";
 
 // Get info for settings and stuff
 char inString[32]; // string for incoming serial data
 int stringPos = 0; // string index counter
 boolean startRead = false; // is reading?
 String dataFromWebsite = ""; // Setup dfw string
-
-// Garage Door strings
-boolean garage_1_enable = true;
-boolean garage_2_enable = true;
 
 int total_buttons = 15; // Get int ready default 15
 int garage_1 = "14"; // If garage 1 is enabled only use 15 inputs as buttons
@@ -555,27 +556,24 @@ void loop() {
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // Check Garage Door 1 Button Status
   if(garage_1_enable){
-  	// Connect to the server and read the output for door button
-    String pageValue_door_button_1 = connectAndRead("/home/garage.php?door_id=1&action=door_button");
-
-    if( DEBUG ) Serial.print(" | - Data From Server :: ");
-    if( DEBUG ) Serial.print(pageValue_door_button_1); //print out the findings.
-    if( DEBUG ) Serial.println(" :: ");
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
     if( DEBUG ) Serial.println(" | Website Command Received for Garage Door Button 1");
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-
+    // Connect to the server and read the output for door button
+    String pageValue_door_button_1 = connectAndRead("/home/garage.php?door_id=1&action=door_button");
+    if( DEBUG ) Serial.print(" | - Data From Server :: ");
+    if( DEBUG ) Serial.print(pageValue_door_button_1); //print out the findings.
+    if( DEBUG ) Serial.println(" :: ");
     // If Door Button pushed, open / close garage door
     if (pageValue_door_button_1 == door_button_push){
       beep(600);
       beep(600);
       delay(10);
-
-        // Pushing button
-        digitalWrite(GarageDoor_1, RELAY_ON);
-        delay(1000);
-        digitalWrite(GarageDoor_1, RELAY_OFF);
-        if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
+      // Pushing button
+      digitalWrite(GarageDoor_1, RELAY_ON);
+      delay(1000);
+      digitalWrite(GarageDoor_1, RELAY_OFF);
+      if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
     }
 
     // If all lights nothing - do nothing with all lights
@@ -585,27 +583,24 @@ void loop() {
   }
   // Check Garage Door 2 Button Status
   if(garage_2_enable){
-  	// Connect to the server and read the output for door button
-    String pageValue_door_button_2 = connectAndRead("/home/garage.php?door_id=2&action=door_button");
-
-    if( DEBUG ) Serial.print(" | - Data From Server :: ");
-    if( DEBUG ) Serial.print(pageValue_door_button_2); //print out the findings.
-    if( DEBUG ) Serial.println(" :: ");
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
     if( DEBUG ) Serial.println(" | Website Command Received for Garage Door Button 2 ");
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-
+    // Connect to the server and read the output for door button
+    String pageValue_door_button_2 = connectAndRead("/home/garage.php?door_id=2&action=door_button");
+    if( DEBUG ) Serial.print(" | - Data From Server :: ");
+    if( DEBUG ) Serial.print(pageValue_door_button_2); //print out the findings.
+    if( DEBUG ) Serial.println(" :: ");
     // If Door Button pushed, open / close garage door
     if (pageValue_door_button_2 == door_button_push){
       beep(600);
       beep(600);
       delay(10);
-
-        // Pushing button
-        digitalWrite(GarageDoor_2, RELAY_ON);
-        delay(1000);
-        digitalWrite(GarageDoor_2, RELAY_OFF);
-        if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 2 BUTTON --  ");
+      // Pushing button
+      digitalWrite(GarageDoor_2, RELAY_ON);
+      delay(1000);
+      digitalWrite(GarageDoor_2, RELAY_OFF);
+      if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 2 BUTTON --  ");
     }
 
     // If all lights nothing - do nothing with all lights
@@ -620,12 +615,17 @@ void loop() {
 
 
   // *** Garage Door Sensor Database Update *** //
-
   if( DEBUG ) Serial.println();
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   if( DEBUG ) Serial.println(" | Checking if Garage Door is Open or Closed ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-
+  if( DEBUG ) Serial.print(" | -- GD1 :  ");
+  if( DEBUG ) Serial.println(relayINw_[15]);
+  if( DEBUG ) Serial.print(" | -- GD1 :  ");
+  if( DEBUG ) Serial.println(door_1_status);
+  if( DEBUG ) Serial.print(" | -- GD1 :  ");
+  if( DEBUG ) Serial.println(garage_1_enable);
+  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // If Door 1 OPEN
   if (relayINw_[15] == "0" && door_1_status == "CLOSED" && garage_1_enable == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_OPEN --  ");
@@ -645,7 +645,14 @@ void loop() {
     // Let Door Button know door is closed
     door_1_status = "CLOSED";
   }
-
+  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+  if( DEBUG ) Serial.print(" | -- GD2 :  ");
+  if( DEBUG ) Serial.println(relayINw_[14]);
+  if( DEBUG ) Serial.print(" | -- GD2 :  ");
+  if( DEBUG ) Serial.println(door_2_status);
+  if( DEBUG ) Serial.print(" | -- GD2 :  ");
+  if( DEBUG ) Serial.println(garage_2_enable);
+  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // If Door 2 OPEN
   if (relayINw_[14] == "0" && door_2_status == "CLOSED" && garage_2_enable == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_OPEN --  ");
@@ -800,9 +807,9 @@ void update_temp_status(char* temp_status, int temp_id){
 // ** Function that controls how the speaker beeps
 // **********************************************************************
 void beep(unsigned char delayms){
-  analogWrite(A5, 20);  // Almost any value can be used except 0 and 255
+  digitalWrite(A5, 20);  // Almost any value can be used except 0 and 255
   delay(delayms);       // wait for a delayms ms
-  analogWrite(A5, 0);   // 0 turns it off
+  digitalWrite(A5, 0);   // 0 turns it off
   delay(delayms);       // wait for a delayms ms
 }
 // **********************************************************************
