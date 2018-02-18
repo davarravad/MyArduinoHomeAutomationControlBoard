@@ -58,13 +58,13 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x25 };
 EthernetClient client;
 
 // IP Address or Domain Name to web server
-char server[] = "arduino.myarduinohome.com";  // Web Server Address
+char server[] = "***********";  // Web Server Address
 
 // House ID - Needed to connect to web server
-int house_id = 8;  // House ID from web site
+int house_id = "***********";  // House ID from web site
 
 // Token For Website - Needed to connect to web server
-String website_token = "69c1312d9e298bc383ab728682269ca8cfb0c1b2a0ffbddb09"; // Token from web site
+String website_token = "***********"; // Token from web site
 
 // Garage Door strings
 bool garageEnable01 = true;  // Enable Garage 1 true/false
