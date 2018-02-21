@@ -1,50 +1,45 @@
-// **********************************************************************
-// **********************************************************************
-// **  Name    : My Arduino Home Automation
-// **  Author  : David "DaVaR" Sargent
-// **  Date    : 15 Jan, 2018
-// **  Version : 2.1
-// **  Hardware: AHACB v2.2
-// **          : CD4021B Shift Register(s)
-// **          : 74HC595 Shift Register(s)
-// **          : Arduino Mega 2560
-// **          : Arduino Ethernet Shield
-// **          : Amazon Alexa
-// **          : MyArduinoHome UserApplePie Website Extension
-// **          : DS18B20 Digital temperature sensors
-// **  Notes   : Use AHACB v2.2 to control lights via light switch
-// **          : buttons, website, or Alexa
-// ** Website  : https://www.MyArduinoHome.com
-// **********************************************************************
-// **********************************************************************
-// ** Include libraries
-// **********************************************************************
+/******************************************************************************
+Name:     : My Arduino Home Automation controller
+Version   : 2.5
+Authors   : David "DaVaR" Sargent
+          : Alex Thompson
+Hardware  : Arduino Mega 2560
+          : Arduino Ethernet Shield
+          : CD4021B Shift Register(s)
+          : 74HC595 Shift Register(s)
+          : MAH WDT (Watch Dog Timer)
+          : Amazon Alexa
+          : MyArduinoHome UserApplePie Website Extension
+          : DS18B20 Digital temperature sensors
+Notes     : Use AHACB v2.2 to control lights via light switch
+          : buttons, website, or Alexa
+Website   : https://www.MyArduinoHome.com
+******************************************************************************/
+
+/***** Include libraries *****/
 #include <SPI.h>
 #include <Ethernet.h> // Used for Ethernet
 #include <OneWire.h> // Used for Multi Temp Sensors
 #include <DallasTemperature.h> // Used for Temp Sensors
 #include <Shifter.h>  // Used for shift registers
-// **********************************************************************
-// ** Declare Constants
-// **********************************************************************
+
+/***** Declare Constants *****/
 // Debug Settings
-#define DEBUG 0  // 1 For Debugging - 0 To Disable Debugging
-
+#define DEBUG 0   // 1 For Debugging - 0 To Disable Debugging
+                  // Debug takes up too much memory for UNO
 // Setup on and off status for relays
-#define RELAY_ON LOW
-#define RELAY_OFF HIGH
-
-// Garage door pins
-#define GarageDoor_1  10
-#define Garage_Door_Sensor_1  15
-#define GarageDoor_2  9
-#define Garage_Door_Sensor_2  14
-
+#define RLON LOW  // Relay ON value
+#define RLOFF HIGH // Relay OFF value
 // Temp Sensor data port
 #define ONE_WIRE_BUS 2
-
 // Number of Registers per board
-#define NUM_REGISTERS 4
+#define NUM_REGISTERS_PER_BOARD 4
+// Number of Boards in Stack
+#define NUM_BOARDS 1  // Edit this if you have more than one board
+// Number of Channels Total Per Board
+#define NUM_CHANNELS_BOARD 8*NUM_REGISTERS_PER_BOARD
+// Total Chips for input or outputs
+#define NUM_CHIPS NUM_BOARDS*NUM_REGISTERS_PER_BOARD
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(ONE_WIRE_BUS);
@@ -66,34 +61,27 @@ EthernetClient client;
 char server[] = "***********";  // Web Server Address
 
 // House ID - Needed to connect to web server
-String house_id = "***********";  // House ID from web site
+const int house_id = "***********";  // House ID from web site
 
 // Token For Website - Needed to connect to web server
-String website_token = "***********"; // Token from web site
+const String website_token = "***********"; // Token from web site
 
 // Garage Door strings
-boolean garage_1_enable = true;  // Enable Garage 1 true/false
-boolean garage_2_enable = true;  // Enable Garage 2 true/false
+bool garageEnable01 = true;  // Enable Garage 1 true/false
+bool garageEnable02 = true;  // Enable Garage 2 true/false
 
 // Let system know if internet is working or not
-boolean internetEnabled = true;
+bool internetEnabled = true;
 
 // Get info for settings and stuff
 char inString[32]; // string for incoming serial data
 int stringPos = 0; // string index counter
-boolean startRead = false; // is reading?
+bool startRead = false; // is reading?
 String dataFromWebsite = ""; // Setup dfw string
 
-int total_buttons = 15; // Get int ready default 15
-int garage_1 = "14"; // If garage 1 is enabled only use 15 inputs as buttons
-int garage_2 = "13"; // If garage 2 is enabled only use 14 inputs as buttons
-String door_button_nothing = "DO_NOTHING";
-String door_button_push = "PUSH_BUTTON";
-String door_1_status = "OPEN";
-String door_2_status = "OPEN";
-
-// Speaker Beep Beep
-int speakerPin = A5;  // Notification speaker
+int total_buttons = NUM_CHANNELS_BOARD*NUM_BOARDS; // Get int ready default 15
+String doorStatus1 = "OPEN";
+String doorStatus2 = "OPEN";
 
 // CD4021
 int inDataPin = 12; //Pin connected to SERIN-Pin11 of CD4021
@@ -106,49 +94,31 @@ int outLatchPin = 8; //Pin connected to ST_CP of 74HC595
 int outClockPin = 6; //Pin connected to SH_CP of 74HC595
 
 //Define variables to hold the data for each shiftIn register.
-byte switchVar1 = 72;  //01001000
-byte switchVar2 = 159; //10011111
-byte switchVar3 = 246; //10011111
-byte switchVar4 = 331; //10011111
-
-// Define Lights status
-boolean light_[] = {false, false, false, false, false, false, false, false, false, false,
-                    false, false, false, false, false, false};
-int lita = 0;
-
-//define an array that corresponds to values for each
-//of the first shift register's pins
-String CD4021[] = {
-    "IN1", "IN2", "IN3", "IN4", "IN5", "IN6", "IN7", "IN8",
-    "IN9", "IN10", "IN11", "IN12", "IN13", "IN14", "IN15", "IN16",
-    "IN1B", "IN2B", "IN3B", "IN4B", "IN5B", "IN6B", "IN7B", "IN8B",
-    "IN9B", "IN10B", "IN11B", "IN12B", "IN13B", "IN14B", "IN15B", "IN16B"};
+byte switchVar[] = {
+  16, 32, 48, 64,
+  80, 96, 112, 128,
+  144, 160, 176, 192,
+  208, 224, 240, 250
+};
 
 // Define Strings for relay inputs
-String relayIN_[] = "";
-String relayINw_[] = "";
-String relayIN = "";
-String relayIN_ALL = "";
-String relayIN_ALL_Loop = "";
-String pageValueLight[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"};
+const int cdInputArraySize = (NUM_CHANNELS_BOARD*NUM_BOARDS);
+String cdINw[cdInputArraySize] = "";
+String cdIN = "";
+String pageValueLight[] = "";
 
-// Timer setup
-unsigned long currentMillis;
-unsigned long previousMillis;
-unsigned long hourTimer = (60*60*1000); // One Hour Timer
+// Define Lights status
+int lightOutputValue[cdInputArraySize];
+int lita = 0;
+
+// WDT Pin
+int wdt = 3;
 
 // Initialize shifter using the Shifter library
-Shifter shifter(outDataPin, outLatchPin, outClockPin, NUM_REGISTERS);
+Shifter shifter(outDataPin, outLatchPin, outClockPin, NUM_CHIPS);
 
-// Function to reset the controller
-void(* resetFunc) (void) = 0; //declare reset function @ address 0
-
-
-// **********************************************************************
-// ** Start of Setup
-// **********************************************************************
-void setup() {
-
+/***** Start of Setup *****/
+void setup(){
   //Define pin modes for 74HC595 Chips
   pinMode(outLatchPin, OUTPUT);
   pinMode(outClockPin, OUTPUT);
@@ -166,49 +136,54 @@ void setup() {
   //start serial
   Serial.begin(9600);
   Serial.println(" --------------------------------------------------- ");
-  Serial.println(" | Arduino Home Automation v2.1");
+  Serial.println(" | Arduino Home Automation v2.5");
   Serial.println(" --------------------------------------------------- ");
 
   // Beep the controller to let user know it just (re)booted
-
-  pinMode(speakerPin, OUTPUT);
-  beep(100);
-  beep(75);
+  pinMode(A5, OUTPUT);
+  beep(600);
+  beep(400);
   beep(50);
 
   Serial.println(" | Designed by David Sargent");
   Serial.println(" --------------------------------------------------- ");
   Serial.println("");
+
+  // Pet the dog
+  wdt_heartbeat();
+
   Serial.println("");
   Serial.println(" --------------------------------------------------- ");
   Serial.println(" | Network Connection Information");
   Serial.println(" --------------------------------------------------- ");
 
-  // Connect to the local network
-  if (Ethernet.begin(mac) == 0){
-    Serial.println(" | Failed to connect to local network.  Running in   ");
-    Serial.println(" | No Internet Mode.  Website and other internet     ");
-    Serial.println(" | devices will NOT work.  Please check your network ");
-    Serial.println(" | and reset the Arduino controller.                 ");
-    Serial.println(" --------------------------------------------------- ");
-    Serial.println("");
-    Serial.println("");
-    internetEnabled = false;
-  }else{
-    Serial.print(" | IP Address        : ");
-    Serial.println(Ethernet.localIP());
-    Serial.print(" | Subnet Mask       : ");
-    Serial.println(Ethernet.subnetMask());
-    Serial.print(" | Default Gateway IP: ");
-    Serial.println(Ethernet.gatewayIP());
-    Serial.print(" | DNS Server IP     : ");
-    Serial.println(Ethernet.dnsServerIP());
-    Serial.println(" --------------------------------------------------- ");
-    Serial.println("");
-    Serial.println("");
-    internetEnabled = true;
+  // Check if user has ethernet enabled
+  if(internetEnabled == true){
+    // Connect to the local network
+    if (Ethernet.begin(mac) == 0){
+      Serial.println(" | Failed to connect to local network.  Running in   ");
+      Serial.println(" | No Internet Mode.  Website and other internet     ");
+      Serial.println(" | devices will NOT work.  Please check your network ");
+      Serial.println(" | and reset the Arduino controller.                 ");
+      Serial.println(" --------------------------------------------------- ");
+      Serial.println("");
+      Serial.println("");
+      internetEnabled = false;
+    }else{
+      Serial.print(" | IP Address        : ");
+      Serial.println(Ethernet.localIP());
+      Serial.print(" | Subnet Mask       : ");
+      Serial.println(Ethernet.subnetMask());
+      Serial.print(" | Default Gateway IP: ");
+      Serial.println(Ethernet.gatewayIP());
+      Serial.print(" | DNS Server IP     : ");
+      Serial.println(Ethernet.dnsServerIP());
+      Serial.println(" --------------------------------------------------- ");
+      Serial.println("");
+      Serial.println("");
+      internetEnabled = true;
+    }
   }
-
 
   // Start up the temp library
   sensors.begin();
@@ -222,25 +197,29 @@ void setup() {
   Serial.println(" --------------------------------------------------- ");
   Serial.println("");
   Serial.println("");
+
+
+  Serial.println(" --------------------------------------------------- ");
+  Serial.println(" | Setting up array size for lightOutputValue");
+  Serial.println(" --------------------------------------------------- ");
+  Serial.print(" | Array Size : ");
+  Serial.println(cdInputArraySize);
+  Serial.println(" --------------------------------------------------- ");
+  Serial.println("");
+  Serial.println("");
+
   Serial.println(" --------------------------------------------------- ");
   Serial.println(" | Controller Setup Now Finished.  Moving on to loop.");
   Serial.println(" --------------------------------------------------- ");
   Serial.println("");
   Serial.println("");
 
-  // Timer setup
-  previousMillis = millis();
-
 }
-// **********************************************************************
-// ** End of Setup
-// **********************************************************************
-// **********************************************************************
-// ** Start of Loop
-// **********************************************************************
-void loop() {
-  // Setup timer for stuff that needs timed
-  unsigned long currentMillis = millis();
+/***** End of Setup *****/
+
+/***** Start of Loop *****/
+void loop(){
+
   // Read Website for Relay Updates
   if( DEBUG ) Serial.println("  ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
@@ -263,273 +242,248 @@ void loop() {
   // set it to 1 to collect parallel data
   digitalWrite(inLatchPin,1);
   // set it to 1 to collect parallel data, wait
-  delayMicroseconds(20);
+  delayMicroseconds(40);
   // set it to 0 to transmit data serially
   digitalWrite(inLatchPin,0);
-
   // while the shift register is in serial mode
   // collect each shift register into a byte
   // the register attached to the chip comes in first
-  switchVar1 = shiftIn(inDataPin, inClockPin);
-  switchVar2 = shiftIn(inDataPin, inClockPin);
-  switchVar3 = shiftIn(inDataPin, inClockPin);
-  switchVar4 = shiftIn(inDataPin, inClockPin);
-
-  if( DEBUG ) Serial.println("  ");
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+  if( DEBUG ) Serial.println(" | ------------------------------------------- ");
   if( DEBUG ) Serial.println(" | ShiftIn Register(s) Status ");
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-
-  // Print out the results.
-  // leading 0's at the top of the byte
-  // (7, 6, 5, etc) will be dropped before
-  // the first pin that has a high input
-  // reading
-  if( DEBUG ) Serial.print(" | CD4021 - 1 -  ");
-  if( DEBUG ) Serial.print(switchVar1, BIN);
-  if( DEBUG ) Serial.println("");
-  if( DEBUG ) Serial.print(" | CD4021 - 2 -  ");
-  if( DEBUG ) Serial.print(switchVar2, BIN);
-  if( DEBUG ) Serial.println("");
-  if( DEBUG ) Serial.print(" | CD4021 - 3 -  ");
-  if( DEBUG ) Serial.print(switchVar3, BIN);
-  if( DEBUG ) Serial.println("");
-  if( DEBUG ) Serial.print(" | CD4021 - 4 -  ");
-  if( DEBUG ) Serial.print(switchVar4, BIN);
-  if( DEBUG ) Serial.println("");
-
-  // First Chip
-  // This for-loop steps through the byte
-  // bit by bit which holds the shift register data
-  // and if it was high (1) then it prints
-  // the corresponding location in the array
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.println(" | CD4021 - 1 ");
-  for (int ina=0; ina<=7; ina++)
+  if( DEBUG ) Serial.println(" | ------------------------------------------- ");
+  int inv_a = 0;
+  int inv_b = 0;
+  // Define Input variables
+  int cdInput[cdInputArraySize];
+  for (int sv_data=0; sv_data<=NUM_CHIPS-1; sv_data++)
   {
-    // so, when n is 3, it compares the bits
-    // in switchVar1 and the binary number 00001000
-    // which will only return true if there is a
-    // 1 in that bit (ie that pin) from the shift
-    // register.
-    if (switchVar1 & (1 << ina) ){
-      // print the value of the array location
-      if( DEBUG ) Serial.print(" | ");
-      if( DEBUG ) Serial.println(CD4021[ina]);
-      relayIN_[ina] = "1";
+    switchVar[sv_data] = shiftIn(inDataPin, inClockPin);
+    if( DEBUG ) Serial.println(" | -------------------------- ");
+    if( DEBUG ) Serial.print(" | CD4021 - ");
+    if( DEBUG ) Serial.println(sv_data);
+    if( DEBUG ) Serial.print(" | switchVar[sv_data], BIN - ");
+    if( DEBUG ) Serial.println(switchVar[sv_data], BIN);
+    if(sv_data > 0){
+      inv_a = ((sv_data+1)*8)-8;
+      inv_b = inv_a+7;
     }else{
-      relayIN_[ina] = "0";
+      inv_a = 0;
+      inv_b = 7;
     }
-    if( DEBUG ) Serial.print(" | ");
-    if( DEBUG ) Serial.println(relayIN_[ina]);
-  }
+    if( DEBUG ) Serial.println(" | -------------------------- ");
+    if( DEBUG ) Serial.print(" | INV_A - ");
+    if( DEBUG ) Serial.println(inv_a);
+    if( DEBUG ) Serial.print(" | INV_B - ");
+    if( DEBUG ) Serial.println(inv_b);
 
-  int inb_8;
-  // Second Chip
-  // This for-loop steps through the byte
-  // bit by bit which holds the shift register data
-  // and if it was high (1) then it prints
-  // the corresponding location in the array
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.println(" | CD4021 - 2  ");
-  for (int inb=0; inb<=7; inb++)
-  {
-    inb_8 = inb + 8;
-    // so, when n is 3, it compares the bits
-    // in switchVar1 and the binary number 00001000
-    // which will only return true if there is a
-    // 1 in that bit (ie that pin) from the shift
-    // register.
-    if (switchVar2 & (1 << inb) ){
-      // print the value of the array location
-      if( DEBUG ) Serial.print(" | ");
-      if( DEBUG ) Serial.println(CD4021[inb_8]);
-      relayIN_[inb_8] = "1";
-    }else{
-      relayIN_[inb_8] = "0";
-    }
-    if( DEBUG ) Serial.print(" | ");
-    if( DEBUG ) Serial.println(relayIN_[inb_8]);
-  }
 
-  int inc_16;
-  // Third Chip
-  // This for-loop steps through the byte
-  // bit by bit which holds the shift register data
-  // and if it was high (1) then it prints
-  // the corresponding location in the array
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.println(" | CD4021 - 3  ");
-  for (int inc=0; inc<=7; inc++)
-  {
-    inc_16 = inc + 16;
-    // so, when n is 3, it compares the bits
-    // in switchVar1 and the binary number 00001000
-    // which will only return true if there is a
-    // 1 in that bit (ie that pin) from the shift
-    // register.
-    if (switchVar3 & (1 << inc) ){
-      // print the value of the array location
+    for (int ina=0; ina<=7; ina++)
+    {
+      // Get current channel number for output array
+      int inb = 0;
+      if(sv_data > 0){
+        inb = ina+inv_a; // Second+ chip 0-7 based on chip
+      }else{
+        inb = ina; // First Chip 0-7
+      }
       if( DEBUG ) Serial.print(" | ");
-      if( DEBUG ) Serial.println(CD4021[inc_16]);
-      relayIN_[inc_16] = "1";
-    }else{
-      relayIN_[inc_16] = "0";
+      if( DEBUG ) Serial.print(inb);
+      // so, when n is 3, it compares the bits
+      // in switchVar1 and the binary number 00001000
+      // which will only return true if there is a
+      // 1 in that bit (ie that pin) from the shift
+      // register.
+      if (switchVar[sv_data] & (1 << ina) ){
+        // print the value of the array location
+        if( DEBUG ) Serial.print(" (inCH:");
+        if( DEBUG ) Serial.print(inb+1);
+        if( DEBUG ) Serial.print("-");
+        if( DEBUG ) Serial.print(ina);
+        if( DEBUG ) Serial.print(") ");
+        cdInput[inb] = 1;
+      }else{
+        cdInput[inb] = 0;
+      }
+      if( DEBUG ) Serial.print(" | ");
+      if( DEBUG ) Serial.println(cdInput[inb]);
+      delay(10);
     }
-    if( DEBUG ) Serial.print(" | ");
-    if( DEBUG ) Serial.println(relayIN_[inc_16]);
-  }
 
-  int ind_24;
-  // Forth Chip
-  // This for-loop steps through the byte
-  // bit by bit which holds the shift register data
-  // and if it was high (1) then it prints
-  // the corresponding location in the array
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.println(" | CD4021 - 4  ");
-  for (int ind=0; ind<=7; ind++)
-  {
-    ind_24 = ind + 24;
-    // so, when n is 3, it compares the bits
-    // in switchVar1 and the binary number 00001000
-    // which will only return true if there is a
-    // 1 in that bit (ie that pin) from the shift
-    // register.
-    if (switchVar4 & (1 << ind) ){
-      // print the value of the array location
-      if( DEBUG ) Serial.print(" | ");
-      if( DEBUG ) Serial.println(CD4021[ind_24]);
-      relayIN_[ind_24] = "1";
-    }else{
-      relayIN_[ind_24] = "0";
-    }
-    if( DEBUG ) Serial.print(" | ");
-    if( DEBUG ) Serial.println(relayIN_[ind_24]);
   }
+  if( DEBUG ) Serial.println(" | -------------------------- ");
+  if( DEBUG ) Serial.println();
 
   // Lights and Relays Updates
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   if( DEBUG ) Serial.println(" | Lights Check ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
 
-  // Check to see if garage doors are enabled
-  if(garage_1_enable == true && garage_2_enable == false){
-      total_buttons = 14;
-  }else if(garage_1_enable == true && garage_2_enable == true){
-      total_buttons = 13;
-  }else{
-      total_buttons = 15;
-  }
-
   if( DEBUG ) Serial.print(" | Total Buttons:  ");
   if( DEBUG ) Serial.print(total_buttons);
   if( DEBUG ) Serial.println(" | ");
 
-  for (int lit=0; lit<=total_buttons; lit++)
+  String cdINallData[] = "";
+  int board_number = 0;
+
+  for (int lit=0; lit<=total_buttons-1; lit++)
   {
-      lita = lit + 1;
+    // Set current board number based on channel
+    if(NUM_BOARDS > 0 && lit >= 0 && lit <= 15){
+      // Skips inputs 0-15 for board 1
+      board_number = 0;
+    }
+    // Check for second set of inputs.  Skip them for relay control
+    if(NUM_BOARDS > 0 && lit >= 16 && lit <= 31){
+      // Skips inputs 16-23 for board 1
+      continue;
+    }
+    // Set current board number based on channel
+    if(NUM_BOARDS > 1 && lit >= 32 && lit <= 47){
+      // Skips inputs 32-47 for board 2
+      board_number = 1;
+    }
+    // Check for second set of inputs.  Skip them for relay control
+    if(NUM_BOARDS > 1 && lit >= 48 && lit <= 63){
+      // Skips inputs 48-63 for board 2
+      continue;
+    }
+    // Set current board number based on channel
+    if(NUM_BOARDS > 2 && lit >= 64 && lit <= 79){
+      // Skips inputs 64-79 for board 3
+      board_number = 2;
+    }
+    // Check for second set of inputs.  Skip them for relay control
+    if(NUM_BOARDS > 2 && lit >= 80 && lit <= 95){
+      // Skips inputs 80-95 for board 3
+      continue;
+    }
+    // Set current board number based on channel
+    if(NUM_BOARDS > 3 && lit >= 96 && lit <= 111){
+      // Skips inputs 96-111 for board 4
+      board_number = 3;
+    }
+    // Check for second set of inputs.  Skip them for relay control
+    if(NUM_BOARDS > 3 && lit >= 112 && lit <= 127){
+      // Skips inputs 112-127 for board 4
+      continue;
+    }
 
-      // Check if internet is enabled
-      if(internetEnabled){
-        pageValueLight[lit] = dataFromWebsite.substring(lit,lita);
+    lita = lit + 1;
+
+    // Check if internet is enabled
+    if(internetEnabled){
+      pageValueLight[lit] = dataFromWebsite.substring(lit,lita);
+    }else{
+      pageValueLight[lit] = "";
+    }
+
+    if( DEBUG ) Serial.print(" | -- Value for Output ");
+    if( DEBUG ) Serial.print(lit);
+    if( DEBUG ) Serial.print("  From Server  : ");
+    if( DEBUG ) Serial.print(pageValueLight[lit]);
+    if( DEBUG ) Serial.println(" --  ");
+
+    if( DEBUG ) Serial.print(" | cdInput : ");
+    if( DEBUG ) Serial.println(cdInput[lit]);
+
+    if( DEBUG ) Serial.print(" | Prev lightOutputValue : ");
+    if( DEBUG ) Serial.println(lightOutputValue[lit]);
+
+    // Check to see if button was pressed
+    if(cdInput[lit] == 1){
+      if(lightOutputValue[lit] == 1){
+        lightOutputValue[lit] = 0;
+        cdINw[lit] = "0";
       }else{
-        pageValueLight[lit] = "";
+        lightOutputValue[lit] = 1;
+        cdINw[lit] = "1";
       }
-
-      if( DEBUG ) Serial.print(" | -- Value for Output ");
-      if( DEBUG ) Serial.print(lit);
-      if( DEBUG ) Serial.print("  From Server  : ");
-      if( DEBUG ) Serial.print(pageValueLight[lit]);
-      if( DEBUG ) Serial.println(" --  ");
-
-      if( DEBUG ) Serial.print(" | ");
-      if( DEBUG ) Serial.println(relayIN_[lit]);
-
-      // Check to see if button was pressed
-      if(relayIN_[lit] == "1"){
-        if(light_[lit] == true){
-          light_[lit] = false;
-          relayINw_[lit] = "0";
-        }else{
-          light_[lit] = true;
-          relayINw_[lit] = "1";
+    }else{
+      // No Button Press, Check Website
+      if(pageValueLight[lit] == "1"){
+        if(lightOutputValue[lit] == 0){
+          lightOutputValue[lit] = 1;
+          cdINw[lit] = "1";
         }
-      }else{
-        // No Button Press, Check Website
-        if(pageValueLight[lit] == "1"){
-          if(light_[lit] == false){
-            light_[lit] = true;
-            relayINw_[lit] = "1";
-          }
-        }else if(pageValueLight[lit] == "0"){
-          if(light_[lit] == true){
-            light_[lit] = false;
-            relayINw_[lit] = "0";
-          }
+      }else if(pageValueLight[lit] == "0"){
+        if(lightOutputValue[lit] == 1){
+          lightOutputValue[lit] = 0;
+          cdINw[lit] = "0";
         }
-
       }
+    }
 
-
+    // Check to see if garage doors are enabled
+    if(garageEnable01 == true && lit == 15){
+      if( DEBUG ) Serial.println(" | Garage 1 Door Skip  ");
+      cdINw[lit] = "0";
+    }else if(garageEnable02 == true && lit == 14){
+      if( DEBUG ) Serial.println(" | Garage 2 Door Skip  ");
+      cdINw[lit] = "0";
+    }else{
       // Change relay state if button pressed
-      if(light_[lit] == true){
+      if(lightOutputValue[lit] == true){
         if( DEBUG ) Serial.print(" | Light  ");
         if( DEBUG ) Serial.print(lit+1);
         if( DEBUG ) Serial.println(" On ");
-        relayINw_[lit] = "1";
-        shifter.setPin(lit, RELAY_ON);
-        shifter.setPin(lit + 16, RELAY_ON);
+        cdINw[lit] = "1";
+        shifter.setPin(lit, RLON);
+        shifter.setPin(lit + 16, RLON);
       }else{
         if( DEBUG ) Serial.print(" | Light  ");
         if( DEBUG ) Serial.print(lit+1);
         if( DEBUG ) Serial.println(" Off ");
-        relayINw_[lit] = "0";
-        shifter.setPin(lit, RELAY_OFF);
-        shifter.setPin(lit + 16, RELAY_OFF);
+        cdINw[lit] = "0";
+        shifter.setPin(lit, RLOFF);
+        shifter.setPin(lit + 16, RLOFF);
       }
+    }
 
-      if( DEBUG ) Serial.println(" -- ");
+    if( DEBUG ) Serial.print(" | New lightOutputValue : ");
+    if( DEBUG ) Serial.println(lightOutputValue[lit]);
+
+    if( DEBUG ) Serial.print(" -- cdINw[");
+    if( DEBUG ) Serial.print(lit);
+    if( DEBUG ) Serial.print("] = ");
+    if( DEBUG ) Serial.print(cdINw[lit]);
+    if( DEBUG ) Serial.println(" -- ");
+
+    cdINallData[board_number] += cdINw[lit];
+    if( DEBUG ) Serial.println(" ------------------------ ");
   }
 
-  if(garage_1_enable == true && garage_2_enable == false){
-      relayIN_ALL = relayINw_[0] + relayINw_[1] + relayINw_[2] + relayINw_[3] + relayINw_[4] + relayINw_[5] + relayINw_[6] + relayINw_[7] +
-              relayINw_[8] + relayINw_[9] + relayINw_[10] + relayINw_[11] + relayINw_[12] + relayINw_[13] + relayINw_[14];
-  }else if(garage_1_enable == true && garage_2_enable == true){
-      relayIN_ALL = relayINw_[0] + relayINw_[1] + relayINw_[2] + relayINw_[3] + relayINw_[4] + relayINw_[5] + relayINw_[6] + relayINw_[7] +
-              relayINw_[8] + relayINw_[9] + relayINw_[10] + relayINw_[11] + relayINw_[12] + relayINw_[13];
-  }else{
-      relayIN_ALL = relayINw_[0] + relayINw_[1] + relayINw_[2] + relayINw_[3] + relayINw_[4] + relayINw_[5] + relayINw_[6] + relayINw_[7] +
-              relayINw_[8] + relayINw_[9] + relayINw_[10] + relayINw_[11] + relayINw_[12] + relayINw_[13] + relayINw_[14] + relayINw_[15];
-  }
 
+  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+  if( DEBUG ) Serial.println(" | Sending Lights Data to Lights Relays ");
+  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // Send data to outputs
   shifter.write(); //send changes to the chain and display them
   // Need some delay or light will flicker when button is pressed if connection to server is fast enough.
-  delay(200);
+  delay(20);
 
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+  if( DEBUG ) Serial.println(" | Setting up Lights Data for website ");
+  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+  // Setup Lights Data for website
+  // Add channels to string for website
+  for (int bid=0; bid<=NUM_BOARDS-1; bid++)
+  {
+    if( DEBUG ) Serial.println();
+    if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+    if( DEBUG ) Serial.print(" | cdINallData[");
+    if( DEBUG ) Serial.print(bid);
+    if( DEBUG ) Serial.print("] : ");
+    if( DEBUG ) Serial.println(cdINallData[bid]);
 
-  if( DEBUG ) Serial.print(" | ");
-  if( DEBUG ) Serial.println(relayIN_ALL);
-
-  if(relayIN_ALL_Loop != relayIN_ALL){
-    if( DEBUG ) Serial.print(" | ");
-    if( DEBUG ) Serial.println(" Changes In Relay Loop - Update Server ");
+    if( DEBUG ) Serial.println(" | Relay Loop - Update Server ");
     if(internetEnabled){
-      connectAndUpdateRelays(relayIN_ALL, "1");
+      connectAndUpdateRelays(cdINallData[bid], bid+1);
     }
-  }else{
-    if( DEBUG ) Serial.print(" | ");
-    if( DEBUG ) Serial.println(" No Changes In Relay Loop ");
   }
-
-  // Update Relay Loop
-  relayIN_ALL_Loop = relayIN_ALL;
 
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // Delay so all these print satements can keep up.
-  if( DEBUG ) delay(1000);
+  if( DEBUG ) delay(10);
 
   // Update Temperature Status to Database
   // Check if internet is enabled
@@ -555,56 +509,62 @@ void loop() {
   if( DEBUG ) Serial.println(" | Checking if Garage Door Button Pushed ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // Check Garage Door 1 Button Status
-  if(garage_1_enable){
+  if(garageEnable01){
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
     if( DEBUG ) Serial.println(" | Website Command Received for Garage Door Button 1");
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-    // Connect to the server and read the output for door button
-    String pageValue_door_button_1 = connectAndRead("/home/garage.php?door_id=1&action=door_button");
-    if( DEBUG ) Serial.print(" | - Data From Server :: ");
-    if( DEBUG ) Serial.print(pageValue_door_button_1); //print out the findings.
-    if( DEBUG ) Serial.println(" :: ");
+    String pageValue_door_button_1 = "DO_NOTHING";
+    if(internetEnabled){
+        // Connect to the server and read the output for door button
+      pageValue_door_button_1 = connectAndRead("/home/garage.php?door_id=1&action=door_button");
+      if( DEBUG ) Serial.print(" | - Data From Server :: ");
+      if( DEBUG ) Serial.print(pageValue_door_button_1); //print out the findings.
+      if( DEBUG ) Serial.println(" :: ");
+    }
     // If Door Button pushed, open / close garage door
-    if (pageValue_door_button_1 == door_button_push){
+    if (pageValue_door_button_1 == "PUSH_BUTTON"){
       beep(600);
-      beep(600);
+      beep(400);
       delay(10);
       // Pushing button
-      digitalWrite(GarageDoor_1, RELAY_ON);
-      delay(1000);
-      digitalWrite(GarageDoor_1, RELAY_OFF);
+      digitalWrite(10, RLON);
+      delay(500);
+      digitalWrite(10, RLOFF);
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
     }
 
     // If all lights nothing - do nothing with all lights
-    if (pageValue_door_button_1 == door_button_nothing){
+    if (pageValue_door_button_1 == "DO_NOTHING"){
       if( DEBUG ) Serial.println(" | -- GARAGE DOOR BUTTON 1 NO CHANGE --  ");
     }
   }
   // Check Garage Door 2 Button Status
-  if(garage_2_enable){
+  if(garageEnable02){
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
     if( DEBUG ) Serial.println(" | Website Command Received for Garage Door Button 2 ");
     if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-    // Connect to the server and read the output for door button
-    String pageValue_door_button_2 = connectAndRead("/home/garage.php?door_id=2&action=door_button");
-    if( DEBUG ) Serial.print(" | - Data From Server :: ");
-    if( DEBUG ) Serial.print(pageValue_door_button_2); //print out the findings.
-    if( DEBUG ) Serial.println(" :: ");
+    String pageValue_door_button_2 = "DO_NOTHING";
+    if(internetEnabled){
+      // Connect to the server and read the output for door button
+      pageValue_door_button_2 = connectAndRead("/home/garage.php?door_id=2&action=door_button");
+      if( DEBUG ) Serial.print(" | - Data From Server :: ");
+      if( DEBUG ) Serial.print(pageValue_door_button_2); //print out the findings.
+      if( DEBUG ) Serial.println(" :: ");
+    }
     // If Door Button pushed, open / close garage door
-    if (pageValue_door_button_2 == door_button_push){
+    if (pageValue_door_button_2 == "PUSH_BUTTON"){
       beep(600);
-      beep(600);
+      beep(400);
       delay(10);
       // Pushing button
-      digitalWrite(GarageDoor_2, RELAY_ON);
-      delay(1000);
-      digitalWrite(GarageDoor_2, RELAY_OFF);
+      digitalWrite(9, RLON);
+      delay(500);
+      digitalWrite(9, RLOFF);
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 2 BUTTON --  ");
     }
 
     // If all lights nothing - do nothing with all lights
-    if (pageValue_door_button_2 == door_button_nothing){
+    if (pageValue_door_button_2 == "DO_NOTHING"){
       if( DEBUG ) Serial.println(" | -- GARAGE DOOR BUTTON 2 NO CHANGE --  ");
     }
   }
@@ -617,88 +577,69 @@ void loop() {
   // *** Garage Door Sensor Database Update *** //
   if( DEBUG ) Serial.println();
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.println(" | Checking if Garage Door is Open or Closed ");
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.print(" | -- GD1 :  ");
-  if( DEBUG ) Serial.println(relayINw_[15]);
-  if( DEBUG ) Serial.print(" | -- GD1 :  ");
-  if( DEBUG ) Serial.println(door_1_status);
-  if( DEBUG ) Serial.print(" | -- GD1 :  ");
-  if( DEBUG ) Serial.println(garage_1_enable);
+  if( DEBUG ) Serial.println(" | Checking if Garage Doors are Open or Closed ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // If Door 1 OPEN
-  if (relayINw_[15] == "0" && door_1_status == "CLOSED" && garage_1_enable == true){
+  if (cdInput[15] == 0 && doorStatus1 == "CLOSED" && garageEnable01 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_OPEN --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=1&action=update_sensor&action_data=OPEN");
     }
     // Let Door Button know door is open
-    door_1_status = "OPEN";
+    doorStatus1 = "OPEN";
   }
 
   // If Door 1 CLOSED
-  if (relayINw_[15] == "1" && door_1_status == "OPEN" && garage_1_enable == true){
+  if (cdInput[15] == 1 && doorStatus1 == "OPEN" && garageEnable01 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_CLOSED --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=1&action=update_sensor&action_data=CLOSED");
     }
     // Let Door Button know door is closed
-    door_1_status = "CLOSED";
+    doorStatus1 = "CLOSED";
   }
+  if( DEBUG ) Serial.print(" | -- GD1 :  ");
+  if( DEBUG ) Serial.println(cdInput[15]);
+  if( DEBUG ) Serial.print(" | -- GD1 :  ");
+  if( DEBUG ) Serial.println(doorStatus1);
+  if( DEBUG ) Serial.print(" | -- GD1 :  ");
+  if( DEBUG ) Serial.println(garageEnable01);
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
-  if( DEBUG ) Serial.print(" | -- GD2 :  ");
-  if( DEBUG ) Serial.println(relayINw_[14]);
-  if( DEBUG ) Serial.print(" | -- GD2 :  ");
-  if( DEBUG ) Serial.println(door_2_status);
-  if( DEBUG ) Serial.print(" | -- GD2 :  ");
-  if( DEBUG ) Serial.println(garage_2_enable);
-  if( DEBUG ) Serial.println(" --------------------------------------------------- ");
+
   // If Door 2 OPEN
-  if (relayINw_[14] == "0" && door_2_status == "CLOSED" && garage_2_enable == true){
+  if (cdInput[14] == 0 && doorStatus2 == "CLOSED" && garageEnable02 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_OPEN --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=2&action=update_sensor&action_data=OPEN");
     }
     // Let Door Button know door is open
-    door_2_status = "OPEN";
+    doorStatus2 = "OPEN";
   }
-
   // If Door 2 CLOSED
-  if (relayINw_[14] == "1" && door_2_status == "OPEN" && garage_2_enable == true){
+  if (cdInput[14] == 1 && doorStatus2 == "OPEN" && garageEnable02 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_CLOSED --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=2&action=update_sensor&action_data=CLOSED");
     }
     // Let Door Button know door is closed
-    door_2_status = "CLOSED";
+    doorStatus2 = "CLOSED";
   }
-
+  if( DEBUG ) Serial.print(" | -- GD2 :  ");
+  if( DEBUG ) Serial.println(cdInput[14]);
+  if( DEBUG ) Serial.print(" | -- GD2 :  ");
+  if( DEBUG ) Serial.println(doorStatus2);
+  if( DEBUG ) Serial.print(" | -- GD2 :  ");
+  if( DEBUG ) Serial.println(garageEnable02);
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   if( DEBUG ) Serial.println(" | End Garage Door Button Check ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   if( DEBUG ) Serial.println();
 
-  // Check for DHCP Lease Renewal Every Hour
-  if(currentMillis - previousMillis > hourTimer)
-  {
-    previousMillis = currentMillis; // get ready for next hour
-
-    if(internetEnabled){
-      Ethernet.maintain(); // Renew DHCP Lease
-    }else{
-      resetFunc();  // Reset the controller
-    }
-
-  }
-
 }
-// **********************************************************************
-// ** End of Loop
-// **********************************************************************
-// ** Start of Functions
-// ***************************************************************************
-// ** Function that checks the shiftIn registers for data
-// **********************************************************************
+/***** End of Loop *****/
+
+/***** Start of Functions *****/
+/***** Function that checks the shiftIn registers for data *****/
 byte shiftIn(int myDataPin, int myClockPin) {
   int i;
   int temp = 0;
@@ -722,9 +663,8 @@ byte shiftIn(int myDataPin, int myClockPin) {
   }
   return myDataIn;
 }
-// **********************************************************************
-// ** Function that updates current Temperature status to web site
-// **********************************************************************
+
+/***** Function that updates current Temperature status to web site *****/
 void update_temp_status(char* temp_status, int temp_id){
     // Setup temperature data before sending to server
     if( DEBUG ) Serial.println("");
@@ -803,18 +743,16 @@ void update_temp_status(char* temp_status, int temp_id){
       return " | Connection Failed - update_temp_status function";
     }
 }
-// **********************************************************************
-// ** Function that controls how the speaker beeps
-// **********************************************************************
+
+/***** Function that controls how the speaker beeps *****/
 void beep(unsigned char delayms){
-  digitalWrite(A5, 20);  // Almost any value can be used except 0 and 255
+  digitalWrite(A5, HIGH);  // Almost any value can be used except 0 and 255
   delay(delayms);       // wait for a delayms ms
-  digitalWrite(A5, 0);   // 0 turns it off
+  digitalWrite(A5, LOW);   // 0 turns it off
   delay(delayms);       // wait for a delayms ms
 }
-// **********************************************************************
-// ** Function that gets and prints current temp from sensors
-// **********************************************************************
+
+/***** Function that gets and prints current temp from sensors *****/
 void printTemperature(DeviceAddress deviceAddress)
 {
   float tempC = sensors.getTempC(deviceAddress);
@@ -827,9 +765,8 @@ void printTemperature(DeviceAddress deviceAddress)
       if( DEBUG ) Serial.print(DallasTemperature::toFahrenheit(tempC));
   }
 }
-// **********************************************************************
-// ** Function that gets current temp from sensors
-// **********************************************************************
+
+/***** Function that gets current temp from sensors *****/
 void getTemperature(DeviceAddress deviceAddress)
 {
   float tempC = sensors.getTempC(deviceAddress);
@@ -840,9 +777,8 @@ void getTemperature(DeviceAddress deviceAddress)
     client.print(DallasTemperature::toFahrenheit(tempC));
   }
 }
-// **********************************************************************
-// ** Function to connect to web server and get data
-// **********************************************************************
+
+/***** Function to connect to web server and get data *****/
 String connectAndRead(char* read_data_page_url){
   // Connect to web server
   if( DEBUG ) Serial.println(" | Connecting... ");
@@ -870,10 +806,9 @@ String connectAndRead(char* read_data_page_url){
     return " | Connection Failed - connectAndRead function";
   }
 }
-// **********************************************************************
-// ** Function to connect to web server and update relay status
-// **********************************************************************
-String connectAndUpdateRelays(String relay_data, String relay_set){
+
+/***** Function to connect to web server and update relay status *****/
+String connectAndUpdateRelays(String relay_data, int relay_set){
   // Connect to web server
   if( DEBUG ) Serial.println(" | Connecting... ");
   // Check for network connection
@@ -890,6 +825,8 @@ String connectAndUpdateRelays(String relay_data, String relay_set){
     client.println(website_token);
     client.println("HTTP/1.0");
     client.println();
+    // Pet The Dog
+    wdt_heartbeat();
     // Connected - Read the page data
     return readPage(); // Read the output
     // If the server's disconnected, stop the client
@@ -903,11 +840,12 @@ String connectAndUpdateRelays(String relay_data, String relay_set){
     return " | Connection Failed - connectAndUpdateRelays function";
   }
 }
-// **********************************************************************
-// ** readPage is used to check the website for commands.
-// ** Website outputs in this format <ALL_ON>
-// ** Arduino reads everything between '<' and '>' to get 'ALL_ON'
-// **********************************************************************
+
+/*****
+  readPage is used to check the website for commands.
+  Website outputs in this format <ALL_ON>
+  Arduino reads everything between '<' and '>' to get 'ALL_ON'
+ *****/
 String readPage(){
   stringPos = 0;
   memset( &inString, 0, 32 ); //clear inString memory
@@ -932,13 +870,27 @@ String readPage(){
     }
   }
 }
-// **********************************************************************
-// ** getBit gets data from shift register in a readable format
-// **********************************************************************
-boolean getBit(byte myVarIn, byte whatBit) {
-  boolean bitState;
+
+/***** getBit gets data from shift register in a readable format *****/
+bool getBit(byte myVarIn, byte whatBit) {
+  bool bitState;
   bitState = myVarIn & (1 << whatBit);
   return bitState;
 }
 
-// ** END of code
+/***** WDT - HeartBeat *****/
+void wdt_heartbeat() {
+  // Sink current to drain charge from watchdog circuit
+  pinMode(wdt, OUTPUT);
+  digitalWrite(wdt, LOW);
+  delay(100);
+  // Return to high-Z
+  pinMode(wdt, INPUT);
+  Serial.println("  ");
+  Serial.println(" --------------------------------------------------- ");
+  Serial.println(" | WDT - Petting The Dog ");
+  Serial.println(" --------------------------------------------------- ");
+  Serial.println("  ");
+}
+
+/***** END of code *****/
