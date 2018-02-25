@@ -228,7 +228,7 @@ void loop(){
   // Check if internet is enabled
   if(internetEnabled){
     // Connect to the server and read the output for relays
-    dataFromWebsite = connectAndRead("/home/relays.php?relay=LIST");
+    dataFromWebsite = connectAndRead("/house/relays.php?relay=LIST");
   }
   if( DEBUG ) Serial.print(" | - Data From Server :: ");
   if( DEBUG ) Serial.print(dataFromWebsite); //print out the findings.
@@ -516,7 +516,7 @@ void loop(){
     String pageValue_door_button_1 = "DO_NOTHING";
     if(internetEnabled){
         // Connect to the server and read the output for door button
-      pageValue_door_button_1 = connectAndRead("/home/garage.php?door_id=1&action=door_button");
+      pageValue_door_button_1 = connectAndRead("/house/garage.php?door_id=1&action=door_button");
       if( DEBUG ) Serial.print(" | - Data From Server :: ");
       if( DEBUG ) Serial.print(pageValue_door_button_1); //print out the findings.
       if( DEBUG ) Serial.println(" :: ");
@@ -546,7 +546,7 @@ void loop(){
     String pageValue_door_button_2 = "DO_NOTHING";
     if(internetEnabled){
       // Connect to the server and read the output for door button
-      pageValue_door_button_2 = connectAndRead("/home/garage.php?door_id=2&action=door_button");
+      pageValue_door_button_2 = connectAndRead("/house/garage.php?door_id=2&action=door_button");
       if( DEBUG ) Serial.print(" | - Data From Server :: ");
       if( DEBUG ) Serial.print(pageValue_door_button_2); //print out the findings.
       if( DEBUG ) Serial.println(" :: ");
@@ -583,7 +583,7 @@ void loop(){
   if (cdInput[15] == 0 && doorStatus1 == "CLOSED" && garageEnable01 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_OPEN --  ");
     if(internetEnabled){
-      connectAndRead("/home/garage.php?door_id=1&action=update_sensor&action_data=OPEN");
+      connectAndRead("/house/garage.php?door_id=1&action=update_sensor&action_data=OPEN");
     }
     // Let Door Button know door is open
     doorStatus1 = "OPEN";
@@ -593,7 +593,7 @@ void loop(){
   if (cdInput[15] == 1 && doorStatus1 == "OPEN" && garageEnable01 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_CLOSED --  ");
     if(internetEnabled){
-      connectAndRead("/home/garage.php?door_id=1&action=update_sensor&action_data=CLOSED");
+      connectAndRead("/house/garage.php?door_id=1&action=update_sensor&action_data=CLOSED");
     }
     // Let Door Button know door is closed
     doorStatus1 = "CLOSED";
@@ -610,7 +610,7 @@ void loop(){
   if (cdInput[14] == 0 && doorStatus2 == "CLOSED" && garageEnable02 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_OPEN --  ");
     if(internetEnabled){
-      connectAndRead("/home/garage.php?door_id=2&action=update_sensor&action_data=OPEN");
+      connectAndRead("/house/garage.php?door_id=2&action=update_sensor&action_data=OPEN");
     }
     // Let Door Button know door is open
     doorStatus2 = "OPEN";
@@ -619,7 +619,7 @@ void loop(){
   if (cdInput[14] == 1 && doorStatus2 == "OPEN" && garageEnable02 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_CLOSED --  ");
     if(internetEnabled){
-      connectAndRead("/home/garage.php?door_id=2&action=update_sensor&action_data=CLOSED");
+      connectAndRead("/house/garage.php?door_id=2&action=update_sensor&action_data=CLOSED");
     }
     // Let Door Button know door is closed
     doorStatus2 = "CLOSED";
@@ -707,7 +707,7 @@ void update_temp_status(char* temp_status, int temp_id){
       if( DEBUG ) Serial.println(" | Connected to Server ");
       if( DEBUG ) Serial.println(" | Updating Data ");
       // Send Temp Data to URL for Web server
-      client.print( "GET /home/temps.php?");
+      client.print( "GET /house/temps.php?");
       client.print("house_id");
       client.print("=");
       client.print(house_id);
@@ -815,7 +815,7 @@ String connectAndUpdateRelays(String relay_data, int relay_set){
   if (client.connect(server, 80)) {
     if( DEBUG ) Serial.println(" | Connected ");
     client.print("GET ");
-    client.print("/home/lightswitch.php?relayset=");
+    client.print("/house/lightswitch.php?relayset=");
     client.print(relay_set);
     client.print("&action=update_relay&action_data=");
     client.print(relay_data);
