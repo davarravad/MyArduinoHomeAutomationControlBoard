@@ -61,7 +61,7 @@ EthernetClient client;
 char server[] = "***********";  // Web Server Address
 
 // House ID - Needed to connect to web server
-const int house_id = "***********";  // House ID from web site
+const int house_id = ***********;  // House ID from web site
 
 // Token For Website - Needed to connect to web server
 const String website_token = "***********"; // Token from web site
