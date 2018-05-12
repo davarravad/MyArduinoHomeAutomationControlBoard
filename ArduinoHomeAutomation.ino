@@ -528,8 +528,10 @@ void loop(){
       delay(10);
       // Pushing button
       digitalWrite(10, RLON);
+	  shifter.setPin(31, RLON);
       delay(500);
       digitalWrite(10, RLOFF);
+	  shifter.setPin(31, RLOFF);
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
     }
 
@@ -558,8 +560,10 @@ void loop(){
       delay(10);
       // Pushing button
       digitalWrite(9, RLON);
+	  shifter.setPin(30, RLON);
       delay(500);
       digitalWrite(9, RLOFF);
+	  shifter.setPin(30, RLOFF);
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 2 BUTTON --  ");
     }
 
