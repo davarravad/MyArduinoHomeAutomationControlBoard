@@ -417,9 +417,11 @@ void loop(){
     if(garageEnable01 == true && lit == 15){
       if( DEBUG ) Serial.println(" | Garage 1 Door Skip  ");
       cdINw[lit] = "0";
+      cdINw[lit + 16] = "1";
     }else if(garageEnable02 == true && lit == 14){
       if( DEBUG ) Serial.println(" | Garage 2 Door Skip  ");
       cdINw[lit] = "0";
+      cdINw[lit + 16] = "1";
     }else{
       // Change relay state if button pressed
       if(lightOutputValue[lit] == true){
@@ -527,11 +529,15 @@ void loop(){
       beep(400);
       delay(10);
       // Pushing button
-      digitalWrite(10, RLON);
-	  shifter.setPin(31, RLOFF);
+      //digitalWrite(10, RLON);
+      shifter.setPin(15, RLON);
+	    shifter.setPin(31, RLOFF);
+      shifter.write(); //send changes to the chain and display them
       delay(500);
-      digitalWrite(10, RLOFF);
-	  shifter.setPin(31, RLON);
+      //digitalWrite(10, RLOFF);
+      shifter.setPin(15, RLOFF);
+	    shifter.setPin(31, RLON);
+      shifter.write(); //send changes to the chain and display them
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
     }
 
@@ -559,11 +565,15 @@ void loop(){
       beep(400);
       delay(10);
       // Pushing button
-      digitalWrite(9, RLON);
-	  shifter.setPin(30, RLOFF);
+      //digitalWrite(9, RLON);
+	    shifter.setPin(30, RLON);
+      shifter.setPin(14, RLOFF);
+      shifter.write(); //send changes to the chain and display them
       delay(500);
-      digitalWrite(9, RLOFF);
-	  shifter.setPin(30, RLON);
+      //digitalWrite(9, RLOFF);
+	    shifter.setPin(30, RLOFF);
+      shifter.setPin(14, RLON);
+      shifter.write(); //send changes to the chain and display them
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 2 BUTTON --  ");
     }
 
