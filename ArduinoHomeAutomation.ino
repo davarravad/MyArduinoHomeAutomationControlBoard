@@ -594,7 +594,7 @@ void loop(){
   if( DEBUG ) Serial.println(" | Checking if Garage Doors are Open or Closed ");
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   // If Door 1 OPEN
-  if (cdInput[15] == 0 && doorStatus1 == "CLOSED" && garageEnable01 == true){
+  if (cdInput[15] == 0 && garageEnable01 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_OPEN --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=1&action=update_sensor&action_data=OPEN");
@@ -604,7 +604,7 @@ void loop(){
   }
 
   // If Door 1 CLOSED
-  if (cdInput[15] == 1 && doorStatus1 == "OPEN" && garageEnable01 == true){
+  if (cdInput[15] == 1 && garageEnable01 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_1_CLOSED --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=1&action=update_sensor&action_data=CLOSED");
@@ -621,7 +621,7 @@ void loop(){
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
 
   // If Door 2 OPEN
-  if (cdInput[14] == 0 && doorStatus2 == "CLOSED" && garageEnable02 == true){
+  if (cdInput[14] == 0 && garageEnable02 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_OPEN --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=2&action=update_sensor&action_data=OPEN");
@@ -630,7 +630,7 @@ void loop(){
     doorStatus2 = "OPEN";
   }
   // If Door 2 CLOSED
-  if (cdInput[14] == 1 && doorStatus2 == "OPEN" && garageEnable02 == true){
+  if (cdInput[14] == 1 && garageEnable02 == true){
     if( DEBUG ) Serial.println(" | -- GARAGE_DOOR_2_CLOSED --  ");
     if(internetEnabled){
       connectAndRead("/home/garage.php?door_id=2&action=update_sensor&action_data=CLOSED");
