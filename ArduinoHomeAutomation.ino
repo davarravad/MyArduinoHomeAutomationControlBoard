@@ -1,6 +1,6 @@
 /******************************************************************************
 Name:     : My Arduino Home Automation controller
-Version   : 2.5
+Version   : 2.6
 Authors   : David "DaVaR" Sargent
           : Alex Thompson
 Hardware  : Arduino Mega 2560
@@ -649,6 +649,9 @@ void loop(){
   if( DEBUG ) Serial.println(" --------------------------------------------------- ");
   if( DEBUG ) Serial.println();
 
+	// Pet The Dog
+	wdt_heartbeat();
+  
 }
 /***** End of Loop *****/
 
@@ -754,7 +757,8 @@ void update_temp_status(char* temp_status, int temp_id){
     }
     else
     {
-      return " | Connection Failed - update_temp_status function";
+	  /** Connection Lost Reset Ethernet **/
+      resetEthernet();
     }
 }
 
@@ -817,7 +821,8 @@ String connectAndRead(char* read_data_page_url){
       client.stop();
     }
   }else{
-    return " | Connection Failed - connectAndRead function";
+      /** Connection Lost Reset Ethernet **/
+      resetEthernet();
   }
 }
 
@@ -839,8 +844,7 @@ String connectAndUpdateRelays(String relay_data, int relay_set){
     client.println(website_token);
     client.println("HTTP/1.0");
     client.println();
-    // Pet The Dog
-    wdt_heartbeat();
+
     // Connected - Read the page data
     return readPage(); // Read the output
     // If the server's disconnected, stop the client
@@ -851,7 +855,8 @@ String connectAndUpdateRelays(String relay_data, int relay_set){
       client.stop();
     }
   }else{
-    return " | Connection Failed - connectAndUpdateRelays function";
+      /** Connection Lost Reset Ethernet **/
+      resetEthernet();
   }
 }
 
@@ -890,6 +895,43 @@ bool getBit(byte myVarIn, byte whatBit) {
   bool bitState;
   bitState = myVarIn & (1 << whatBit);
   return bitState;
+}
+
+/***** 
+  Connection Lost Reset Ethernet
+  The Arduino looks to have lost 
+  connection with the Ethernet shield
+  Restart the Ethernet with this function
+ *****/
+void resetEthernet() {
+  wdt_heartbeat();
+  // Check if user has ethernet enabled
+  if(internetEnabled == true){
+    // Connect to the local network
+    if (Ethernet.begin(mac) == 0){
+      Serial.println(" | Failed to connect to local network.  Running in   ");
+      Serial.println(" | No Internet Mode.  Website and other internet     ");
+      Serial.println(" | devices will NOT work.  Please check your network ");
+      Serial.println(" | and reset the Arduino controller.                 ");
+      Serial.println(" --------------------------------------------------- ");
+      Serial.println("");
+      Serial.println("");
+      internetEnabled = false;
+    }else{
+      Serial.print(" | IP Address        : ");
+      Serial.println(Ethernet.localIP());
+      Serial.print(" | Subnet Mask       : ");
+      Serial.println(Ethernet.subnetMask());
+      Serial.print(" | Default Gateway IP: ");
+      Serial.println(Ethernet.gatewayIP());
+      Serial.print(" | DNS Server IP     : ");
+      Serial.println(Ethernet.dnsServerIP());
+      Serial.println(" --------------------------------------------------- ");
+      Serial.println("");
+      Serial.println("");
+      internetEnabled = true;
+    }
+  }
 }
 
 /***** WDT - HeartBeat *****/
