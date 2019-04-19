@@ -1,6 +1,7 @@
 /******************************************************************************
 Name:     : My Arduino Home Automation controller
-Version   : 2.6
+Version   : 2.7
+Date      : 4/19/19
 Authors   : David "DaVaR" Sargent
           : Alex Thompson
 Hardware  : Arduino Mega 2560
@@ -57,6 +58,11 @@ DeviceAddress temp_3 = { 0x28, 0x7D, 0xFE, 0x7D, 0x06, 0x00, 0x00, 0x2C };
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x25 };
 EthernetClient client;
 
+// -----------------------------------------
+// This is the only area of the code that should
+// need to be edited.  Replace the ***********
+// with the information from your mah website.
+// -----------------------------------------
 // IP Address or Domain Name to web server
 char server[] = "***********";  // Web Server Address
 
@@ -65,6 +71,7 @@ const int house_id = ***********;  // House ID from web site
 
 // Token For Website - Needed to connect to web server
 const String website_token = "***********"; // Token from web site
+//------------------------------------------
 
 // Garage Door strings
 bool garageEnable01 = true;  // Enable Garage 1 true/false
@@ -536,7 +543,7 @@ void loop(){
       delay(500);
       //digitalWrite(10, RLOFF);
       shifter.setPin(15, RLOFF);
-	    shifter.setPin(31, RLON);
+	    shifter.setPin(31, RLFF);
       shifter.write(); //send changes to the chain and display them
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
     }
@@ -572,7 +579,7 @@ void loop(){
       delay(500);
       //digitalWrite(9, RLOFF);
 	    shifter.setPin(30, RLOFF);
-      shifter.setPin(14, RLON);
+      shifter.setPin(14, RLOFF);
       shifter.write(); //send changes to the chain and display them
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 2 BUTTON --  ");
     }
@@ -651,7 +658,7 @@ void loop(){
 
 	// Pet The Dog
 	wdt_heartbeat();
-  
+
 }
 /***** End of Loop *****/
 
@@ -897,9 +904,9 @@ bool getBit(byte myVarIn, byte whatBit) {
   return bitState;
 }
 
-/***** 
+/*****
   Connection Lost Reset Ethernet
-  The Arduino looks to have lost 
+  The Arduino looks to have lost
   connection with the Ethernet shield
   Restart the Ethernet with this function
  *****/
