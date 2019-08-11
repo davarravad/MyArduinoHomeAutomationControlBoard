@@ -543,7 +543,7 @@ void loop(){
       delay(500);
       //digitalWrite(10, RLOFF);
       shifter.setPin(15, RLOFF);
-	    shifter.setPin(31, RLFF);
+	    shifter.setPin(31, RLOFF);
       shifter.write(); //send changes to the chain and display them
       if( DEBUG ) Serial.println(" | -- PUSHED GARAGE DOOR 1 BUTTON --  ");
     }
